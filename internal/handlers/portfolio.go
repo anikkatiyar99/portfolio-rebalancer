@@ -37,19 +37,8 @@ func (h *Handler) HandlePortfolio(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("HandlePortfolio==", p)
 
-	for _, percent := range p.Allocation {
-		if percent < 0 || percent > 100 {
-			http.Error(w, "Allocation percentages must be between 0 and 100", http.StatusBadRequest)
-			return
-		}
-	}
-
-	var sum float64
-	for _, percent := range p.Allocation {
-		sum += percent
-	}
-	if sum != 100.0 {
-		http.Error(w, "Total allocation must sum to 100%", http.StatusBadRequest)
+	if err := p.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -76,6 +65,10 @@ func (h *Handler) HandleRebalance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.rebalanceService.Rebalance(r.Context(), p); err != nil {
+		if errors.Is(err, services.ErrInvalidUserID) || errors.Is(err, services.ErrInvalidAllocation) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		if errors.Is(err, services.ErrPortfolioNotFound) {
 			http.Error(w, "User not found", http.StatusNotFound)
 			return

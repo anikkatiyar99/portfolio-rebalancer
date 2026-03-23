@@ -11,8 +11,6 @@ import (
 	"portfolio-rebalancer/internal/storage"
 )
 
-var ErrPortfolioNotFound = errors.New("portfolio not found")
-
 const rebalanceTolerance = 1e-9
 
 type RebalanceService struct {
@@ -28,6 +26,10 @@ func NewRebalanceService(store storage.PortfolioStore, publisher queue.MessagePu
 }
 
 func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPortfolio) error {
+	if err := req.Validate(); err != nil {
+		return classifyValidationError(err)
+	}
+
 	original, err := s.store.GetPortfolio(ctx, req.UserID)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrPortfolioNotFound, err)
@@ -62,6 +64,17 @@ func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPort
 	}
 
 	return nil
+}
+
+func classifyValidationError(err error) error {
+	var validationErr *models.ValidationError
+	if !errors.As(err, &validationErr) {
+		return fmt.Errorf("%w: %v", ErrInvalidAllocation, err)
+	}
+	if validationErr.Field == "user_id" {
+		return fmt.Errorf("%w: %s", ErrInvalidUserID, validationErr.Error())
+	}
+	return fmt.Errorf("%w: %s", ErrInvalidAllocation, validationErr.Error())
 }
 
 func CalculateRebalance(currentAllocation, updatedAllocation map[string]float64) []models.RebalanceTransaction {
