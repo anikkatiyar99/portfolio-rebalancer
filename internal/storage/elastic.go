@@ -14,9 +14,20 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
+type PortfolioStore interface {
+	SavePortfolio(ctx context.Context, p models.Portfolio) error
+	GetPortfolio(ctx context.Context, userID string) (*models.Portfolio, error)
+	SaveTransaction(ctx context.Context, t models.RebalanceTransaction) error
+}
+
+type ElasticStore struct{}
+
+func NewElasticStore() *ElasticStore {
+	return &ElasticStore{}
+}
+
 var esClient *elasticsearch.Client
 
-// InitElastic initializes elasticsearch connection with retry logic
 func InitElastic() error {
 	cfg := elasticsearch.Config{
 		Addresses: []string{
@@ -48,7 +59,7 @@ func InitElastic() error {
 	return fmt.Errorf("failed to connect to Elasticsearch after retries: %w", err)
 }
 
-func SavePortfolio(ctx context.Context, p models.Portfolio) error {
+func (e *ElasticStore) SavePortfolio(ctx context.Context, p models.Portfolio) error {
 	body, err := json.Marshal(p)
 	if err != nil {
 		return err
@@ -68,7 +79,7 @@ func SavePortfolio(ctx context.Context, p models.Portfolio) error {
 	return nil
 }
 
-func GetPortfolio(ctx context.Context, userID string) (*models.Portfolio, error) {
+func (e *ElasticStore) GetPortfolio(ctx context.Context, userID string) (*models.Portfolio, error) {
 	res, err := esClient.Get("portfolios", userID)
 	if err != nil {
 		return nil, err
@@ -90,7 +101,7 @@ func GetPortfolio(ctx context.Context, userID string) (*models.Portfolio, error)
 	return &esResp.Source, nil
 }
 
-func SaveTransaction(ctx context.Context, t models.RebalanceTransaction) error {
+func (e *ElasticStore) SaveTransaction(ctx context.Context, t models.RebalanceTransaction) error {
 	body, err := json.Marshal(t)
 	if err != nil {
 		return err

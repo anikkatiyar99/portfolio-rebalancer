@@ -1,4 +1,4 @@
-package kafka
+package queue
 
 import (
 	"context"
@@ -10,15 +10,24 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+type MessagePublisher interface {
+	PublishMessage(ctx context.Context, payload []byte) error
+}
+
+type KafkaPublisher struct{}
+
+func NewKafkaPublisher() *KafkaPublisher {
+	return &KafkaPublisher{}
+}
+
 var writer *kafka.Writer
 
-// InitKafka initializes kafka connection
 func InitKafka() error {
 	kafkaBroker := os.Getenv("KAFKA_BROKER")
 	topic := os.Getenv("KAFKA_TOPIC")
 
 	if kafkaBroker == "" || topic == "" {
-		return nil // skip if env not set
+		return nil
 	}
 
 	writer = &kafka.Writer{
@@ -27,7 +36,6 @@ func InitKafka() error {
 		Balancer: &kafka.LeastBytes{},
 	}
 
-	// Retry logic to check Kafka availability
 	for i := 0; i < 10; i++ {
 		err := writer.WriteMessages(context.Background(), kafka.Message{
 			Value: []byte("ping"),
@@ -43,7 +51,7 @@ func InitKafka() error {
 	return nil
 }
 
-func PublishMessage(ctx context.Context, payload []byte) error {
+func (k *KafkaPublisher) PublishMessage(ctx context.Context, payload []byte) error {
 	if writer == nil {
 		log.Println("Kafka writer is nil; skipping message publish")
 		return fmt.Errorf("kafka writer not initialized")
@@ -56,7 +64,7 @@ func PublishMessage(ctx context.Context, payload []byte) error {
 	return writer.WriteMessages(ctx, msg)
 }
 
-func ConsumeMessage(ctx context.Context, handler func(kafka.Message)) error {
+func (k *KafkaPublisher) ConsumeMessage(ctx context.Context, handler func(kafka.Message)) error {
 	kafkaBroker := os.Getenv("KAFKA_BROKER")
 	topic := os.Getenv("KAFKA_TOPIC")
 
@@ -69,8 +77,8 @@ func ConsumeMessage(ctx context.Context, handler func(kafka.Message)) error {
 		Brokers:   []string{kafkaBroker},
 		Topic:     topic,
 		Partition: 0,
-		MinBytes:  10e3, // 10KB
-		MaxBytes:  10e6, // 10MB
+		MinBytes:  10e3,
+		MaxBytes:  10e6,
 	})
 
 	reader.SetOffset(kafka.FirstOffset)
@@ -83,7 +91,6 @@ func ConsumeMessage(ctx context.Context, handler func(kafka.Message)) error {
 				log.Printf("Kafka read error: %v\n", err)
 				continue
 			}
-
 			handler(msg)
 		}
 	}()
