@@ -11,5 +11,8 @@ type UpdatedPortfolio struct {
 }
 
 type RebalanceTransaction struct {
-	// TODO: Add model
+	UserID           string  `json:"user_id"`
+	Action           string  `json:"action"`            // can be BUY/SELL
+	Asset            string  `json:"asset"`             // can be stocks, bonds, commodities, etc.
+	RebalancePercent float64 `json:"rebalance_percent"` // how much to move
 }

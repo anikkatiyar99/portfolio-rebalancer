@@ -89,3 +89,23 @@ func GetPortfolio(ctx context.Context, userID string) (*models.Portfolio, error)
 
 	return &esResp.Source, nil
 }
+
+func SaveTransaction(ctx context.Context, t models.RebalanceTransaction) error {
+	body, err := json.Marshal(t)
+	if err != nil {
+		return err
+	}
+
+	res, err := esClient.Index("transactions", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("error saving transaction: %s", res.String())
+	}
+
+	log.Printf("Transaction saved for user %s", t.UserID)
+	return nil
+}
