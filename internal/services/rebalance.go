@@ -31,9 +31,22 @@ func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPort
 	}
 
 	transactions := CalculateRebalance(original.Allocation, req.NewAllocation)
+	if len(transactions) == 0 {
+		return nil
+	}
+
+	errCh := make(chan error, len(transactions))
 	for _, transaction := range transactions {
 		transaction.UserID = req.UserID
-		if err := s.store.SaveTransaction(ctx, transaction); err != nil {
+		transaction := transaction // capture range variable
+
+		go func() {
+			errCh <- s.store.SaveTransaction(ctx, transaction)
+		}()
+	}
+
+	for range transactions {
+		if err := <-errCh; err != nil {
 			payload, marshalErr := json.Marshal(req)
 			if marshalErr != nil {
 				return fmt.Errorf("save transaction: %w; marshal fallback payload: %v", err, marshalErr)
