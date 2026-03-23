@@ -18,6 +18,12 @@ docker compose build
 docker compose up
 ```
 
+API base URL: `http://localhost:8080`
+
+Swagger UI: `http://localhost:8080/docs/index.html`
+
+OpenAPI JSON: `http://localhost:8080/docs/doc.json`
+
 
 ## Models
 

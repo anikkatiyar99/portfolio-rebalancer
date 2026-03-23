@@ -22,6 +22,18 @@ func NewHandler(store storage.PortfolioStore, rebalanceService services.Rebalanc
 	}
 }
 
+// HandlePortfolio godoc
+// @Summary Create portfolio
+// @Description Create a user's portfolio with target allocation percentages
+// @Tags portfolio
+// @Accept json
+// @Produce json
+// @Param request body models.Portfolio true "Portfolio payload"
+// @Success 201 {object} models.Portfolio
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 405 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /portfolio [post]
 func (h *Handler) HandlePortfolio(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -51,6 +63,19 @@ func (h *Handler) HandlePortfolio(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(p)
 }
 
+// HandleRebalance godoc
+// @Summary Rebalance portfolio
+// @Description Calculate and persist rebalance transactions for a user's updated allocation
+// @Tags portfolio
+// @Accept json
+// @Produce json
+// @Param request body models.UpdatedPortfolio true "Updated portfolio payload"
+// @Success 200 {object} models.MessageResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 405 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /rebalance [post]
 func (h *Handler) HandleRebalance(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -80,4 +105,5 @@ func (h *Handler) HandleRebalance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(models.MessageResponse{Message: "Rebalance processed"})
 }

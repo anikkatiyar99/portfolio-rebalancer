@@ -1,0 +1,114 @@
+basePath: /
+definitions:
+  models.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  models.MessageResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  models.Portfolio:
+    properties:
+      allocation:
+        additionalProperties:
+          format: float64
+          type: number
+        description: Current user allocation in percentage terms
+        type: object
+      user_id:
+        type: string
+    type: object
+  models.UpdatedPortfolio:
+    properties:
+      new_allocation:
+        additionalProperties:
+          format: float64
+          type: number
+        description: Updated user allocation from provider in percentage terms
+        type: object
+      user_id:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: APIs for managing portfolios and triggering rebalance transactions.
+  title: Portfolio Rebalancer API
+  version: "1.0"
+paths:
+  /portfolio:
+    post:
+      consumes:
+      - application/json
+      description: Create a user's portfolio with target allocation percentages
+      parameters:
+      - description: Portfolio payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.Portfolio'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Portfolio'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Create portfolio
+      tags:
+      - portfolio
+  /rebalance:
+    post:
+      consumes:
+      - application/json
+      description: Calculate and persist rebalance transactions for a user's updated
+        allocation
+      parameters:
+      - description: Updated portfolio payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdatedPortfolio'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "405":
+          description: Method Not Allowed
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Rebalance portfolio
+      tags:
+      - portfolio
+swagger: "2.0"
