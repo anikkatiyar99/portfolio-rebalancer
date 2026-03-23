@@ -1,10 +1,10 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	_ "portfolio-rebalancer/docs"
 	"portfolio-rebalancer/internal/handlers"
+	"portfolio-rebalancer/internal/logging"
 	"portfolio-rebalancer/internal/queue"
 	"portfolio-rebalancer/internal/services"
 	"portfolio-rebalancer/internal/storage"
@@ -17,12 +17,16 @@ import (
 // @description APIs for managing portfolios and triggering rebalance transactions.
 // @BasePath /
 func main() {
+	logging.SetLevel("")
+
 	if err := storage.InitElastic(); err != nil {
-		log.Fatalf("Failed to initialize Elasticsearch: %v", err)
+		logging.Errorf("failed to initialize Elasticsearch: %v", err)
+		panic(err)
 	}
 
 	if err := queue.InitKafka(); err != nil {
-		log.Fatalf("Failed to initialize Kafka: %v", err)
+		logging.Errorf("failed to initialize Kafka: %v", err)
+		panic(err)
 	}
 
 	store := storage.NewElasticStore()
@@ -36,6 +40,9 @@ func main() {
 		httpSwagger.URL("/docs/doc.json"),
 	))
 
-	log.Println("Server started at :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	logging.Infof("server started at :8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		logging.Errorf("server failed: %v", err)
+		panic(err)
+	}
 }

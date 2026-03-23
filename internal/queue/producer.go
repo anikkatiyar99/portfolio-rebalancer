@@ -3,8 +3,8 @@ package queue
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
+	"portfolio-rebalancer/internal/logging"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -37,10 +37,10 @@ func InitKafka() error {
 			Value: []byte("ping"),
 		})
 		if err == nil {
-			log.Println("Kafka is ready")
+			logging.Infof("Kafka is ready")
 			return nil
 		}
-		log.Println("Waiting for Kafka to be ready...")
+		logging.Infof("waiting for Kafka to be ready")
 		time.Sleep(2 * time.Second)
 	}
 
@@ -49,7 +49,7 @@ func InitKafka() error {
 
 func (k *KafkaPublisher) PublishMessage(ctx context.Context, payload []byte) error {
 	if writer == nil {
-		log.Println("Kafka writer is nil; skipping message publish")
+		logging.Warnf("Kafka writer is nil; skipping message publish")
 		return fmt.Errorf("kafka writer not initialized")
 	}
 
@@ -65,7 +65,7 @@ func (k *KafkaPublisher) ConsumeMessage(ctx context.Context, handler func(kafka.
 	topic := os.Getenv("KAFKA_TOPIC")
 
 	if kafkaBroker == "" || topic == "" {
-		log.Println("Kafka consumer config not set; skipping consumer start.")
+		logging.Warnf("Kafka consumer config not set; skipping consumer start")
 		return nil
 	}
 
@@ -84,13 +84,13 @@ func (k *KafkaPublisher) ConsumeMessage(ctx context.Context, handler func(kafka.
 		for {
 			msg, err := reader.ReadMessage(ctx)
 			if err != nil {
-				log.Printf("Kafka read error: %v\n", err)
+				logging.Errorf("Kafka read error: %v", err)
 				continue
 			}
 			handler(msg)
 		}
 	}()
 
-	log.Println("Kafka consumer started")
+	logging.Infof("Kafka consumer started")
 	return nil
 }

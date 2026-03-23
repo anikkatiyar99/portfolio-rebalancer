@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
+	"portfolio-rebalancer/internal/logging"
 	"time"
 
 	"portfolio-rebalancer/internal/models"
@@ -35,18 +35,18 @@ func InitElastic() error {
 	for i := 1; i <= 5; i++ {
 		client, err = elasticsearch.NewClient(cfg)
 		if err != nil {
-			log.Printf("Failed to create client: %v", err)
+			logging.Errorf("failed to create elasticsearch client: %v", err)
 		} else {
 			_, err = client.Info()
 			if err == nil {
-				log.Println("Connected to Elasticsearch")
+				logging.Infof("connected to Elasticsearch")
 				esClient = client
 				return nil
 			}
-			log.Printf("Client created, but ES not ready: %v", err)
+			logging.Warnf("elasticsearch not ready yet: %v", err)
 		}
 
-		log.Printf("Retrying connection to Elasticsearch... (%d/5)", i)
+		logging.Infof("retrying connection to Elasticsearch (%d/5)", i)
 		time.Sleep(5 * time.Second)
 	}
 
@@ -69,7 +69,7 @@ func (e *ElasticStore) SavePortfolio(ctx context.Context, p models.Portfolio) er
 		return fmt.Errorf("error saving portfolio: %s", res.String())
 	}
 
-	log.Printf("Portfolio saved for user %s", p.UserID)
+	logging.Infof("portfolio saved for user %s", p.UserID)
 	return nil
 }
 
@@ -81,7 +81,7 @@ func (e *ElasticStore) GetPortfolio(ctx context.Context, userID string) (*models
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, fmt.Errorf("user not found")
+		return nil, ErrPortfolioNotFound
 	}
 
 	var esResp struct {
@@ -111,6 +111,6 @@ func (e *ElasticStore) SaveTransaction(ctx context.Context, t models.RebalanceTr
 		return fmt.Errorf("error saving transaction: %s", res.String())
 	}
 
-	log.Printf("Transaction saved for user %s", t.UserID)
+	logging.Infof("transaction saved for user %s", t.UserID)
 	return nil
 }

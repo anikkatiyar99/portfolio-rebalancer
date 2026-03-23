@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"portfolio-rebalancer/internal/logging"
 	"portfolio-rebalancer/internal/models"
 	"portfolio-rebalancer/internal/queue"
 	"portfolio-rebalancer/internal/storage"
@@ -36,6 +37,9 @@ func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPort
 
 	original, err := s.store.GetPortfolio(ctx, req.UserID)
 	if err != nil {
+		if errors.Is(err, storage.ErrPortfolioNotFound) {
+			return ErrPortfolioNotFound
+		}
 		return fmt.Errorf("%w: %v", ErrPortfolioNotFound, err)
 	}
 
@@ -62,6 +66,7 @@ func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPort
 				return fmt.Errorf("save transaction: %w; marshal fallback payload: %v", err, marshalErr)
 			}
 			if publishErr := s.publisher.PublishMessage(ctx, payload); publishErr != nil {
+				logging.Errorf("failed to publish Kafka fallback for user %s: %v", req.UserID, publishErr)
 				return fmt.Errorf("save transaction: %w; publish fallback payload: %v", err, publishErr)
 			}
 			return fmt.Errorf("save transaction: %w", err)
