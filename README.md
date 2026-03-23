@@ -1,105 +1,268 @@
 # Portfolio Rebalancer
 
-This is a take-home assignment to build backend APIs for managing and rebalancing user portfolios.
+A Go backend for creating user portfolios and generating rebalance transactions when a provider sends updated allocations.
 
+## What This Service Does
+
+- Creates a portfolio for a user with a target allocation.
+- Accepts updated market allocations for that user.
+- Calculates the `BUY` and `SELL` transactions needed to rebalance back to the user's original target allocation.
+- Persists portfolios and rebalance transactions in Elasticsearch.
+- Publishes a Kafka fallback message if transaction persistence fails.
+- Exposes Swagger UI for interactive API testing.
 
 ## Tech Stack
 
 - Go
-- Elasticsearch (Feel free to use any other database or an in-memory alternative)
-- Kafka (Feel free to use any other messaging system if needed)
-- Docker
+- Elasticsearch
+- Kafka
+- Docker Compose
+- Swagger / OpenAPI
 
+## Project Structure
 
-## Running the Project
+- [`cmd/api/main.go`](/Users/anik/Desktop/wahed-test/portfolio-rebalancer/cmd/api/main.go): minimal entrypoint
+- [`cmd/api/bootstrap.go`](/Users/anik/Desktop/wahed-test/portfolio-rebalancer/cmd/api/bootstrap.go): dependency initialization and HTTP server startup
+- [`cmd/api/routes.go`](/Users/anik/Desktop/wahed-test/portfolio-rebalancer/cmd/api/routes.go): route registration and Swagger docs route
+- [`internal/handlers/portfolio.go`](/Users/anik/Desktop/wahed-test/portfolio-rebalancer/internal/handlers/portfolio.go): HTTP handlers and error mapping
+- [`internal/services/rebalance.go`](/Users/anik/Desktop/wahed-test/portfolio-rebalancer/internal/services/rebalance.go): rebalance calculation and orchestration
+- [`internal/storage/elastic.go`](/Users/anik/Desktop/wahed-test/portfolio-rebalancer/internal/storage/elastic.go): Elasticsearch storage implementation
+- [`internal/queue/producer.go`](/Users/anik/Desktop/wahed-test/portfolio-rebalancer/internal/queue/producer.go): Kafka publisher
+- [`docs/`](/Users/anik/Desktop/wahed-test/portfolio-rebalancer/docs): generated Swagger docs
 
+## Startup
+
+### Requirements
+
+- Docker Desktop / Docker Engine with Compose
+
+### Start With Docker
+
+```bash
+docker compose up --build
 ```
-docker compose build
-docker compose up
+
+Run in the background:
+
+```bash
+docker compose up --build -d
 ```
 
-API base URL: `http://localhost:8080`
+Stop everything:
 
-Swagger UI: `http://localhost:8080/docs/index.html`
+```bash
+docker compose down
+```
 
-OpenAPI JSON: `http://localhost:8080/docs/doc.json`
+### Service URLs
 
+- API base URL: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/docs/index.html`
+- OpenAPI JSON: `http://localhost:8080/docs/doc.json`
+- Elasticsearch: `http://localhost:9200`
 
-## Models
+### Health Checks
 
-- Portfolio 
-        - `UserID` field is a unique user identifier in our system
-        - `Allocation` field represents the percentage of the user's total portfolio or cash distribution across different asset classes. 
-            Eg: {"stocks": 60, "bonds": 30, "gold": 10}.
-            Note: This means 60% of the user's portfolio is allocated to stocks, 30% to bonds, and 10% to gold
-            
-- UpdatedPortfolio 
-        - `UserID` is the user's unique ID
-        - `NewAllocation` is the new allocation of user portfolio in %.
+Check container status:
 
-- RebalanceTransaction
-        - `userID` is the user's unique ID
-        - `Action` is the type of transaction (BUY/SELL)
-        - `Asset` is the type of user asset to be transferred (eg: stocks, bonds, gold etc.)
-        - `RebalancePercent` is the percentage of the asset transferred
+```bash
+docker compose ps
+```
 
-- Feel free to edit/add models
+View API logs:
 
+```bash
+docker compose logs -f api
+```
 
-## APIs
-- /portfolio : This takes in userId and current user allocation. This will api will be used to create users in our system along with their portfolio allocation.
+## Environment
 
-- /rebalance : This is the API that simulates a third-party provider, which calculates a user's portfolio allocation based on market changes and returns an updated allocation. For the current task, we will manually call this API to mock the third-party interaction.
+The Docker setup configures these values for the API container:
 
+- `ELASTICSEARCH_URL=http://elasticsearch:9200`
+- `KAFKA_BROKER=kafka:9092`
+- `KAFKA_TOPIC=rebalance`
 
-- Feel free to edit/add APIs
+The app also supports:
 
+- `LOG_LEVEL`
 
-## TODO
+Supported log levels:
 
-- Complete the `/portfolio` API
-    - Accept a new user's portfolio details via a POST request.
-    - Persist the portfolio in Elasticsearch.
+- `DEBUG`
+- `INFO`
+- `WARN`
+- `ERROR`
 
-- Complete the `/rebalance` API
-    - Accept a user's updated portfolio based on market conditions via a POST request.
-    - Maintain the user's original allocation percentages for reference.
-    - Calculate the transactions needed to rebalance the user's current portfolio allocation percentage back to their original allocation percentage.
-    - Save the RebalanceTransaction in Elasticsearch.
+## API Overview
 
-- Assuming we could get multiple rebalance api calls from the provider, we need to ensure our system can handle load and is fault tolerant(could be supported by adding queue and retries).
+### 1. Create Portfolio
 
-- Write a README
+`POST /portfolio/{user_id}`
 
-- Feel free to add further capabilities.
+Creates a new portfolio for a user.
 
+Request body:
 
-## Example
+```json
+{
+  "allocation": {
+    "stocks": 60,
+    "bonds": 30,
+    "gold": 10
+  }
+}
+```
 
-- `/portfolio` API creates a user with ID = 1 and Allocation = {"stocks": 60, "bonds": 30, "gold": 10}
-    Note: here the allocation is 60% stocks, 30% bonds and 10% gold
+Success response: `201 Created`
 
-- `/rebalance` API is called with inputs
-    ID = 1
-    NewAllocation = {"stocks": 70, "bonds": 20, "gold": 10}
-    [This is how much the user's portfolio has moved due to market conditions]
+Example:
 
-- We need to calculate and save the RebalanceTransaction to maintain 60% stocks, 30% bonds and 10% gold.
+```bash
+curl -X POST http://localhost:8080/portfolio/user-1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "allocation": {
+      "stocks": 60,
+      "bonds": 30,
+      "gold": 10
+    }
+  }'
+```
 
-    Transaction 1: 
-            UserID = "1"
-	        Sell 10% of stocks
+Behavior:
 
-    Transaction 2: 
-            UserID = "1"
-	        Buy 10% of bonds
+- Creating the same `user_id` again returns `409 Conflict`.
+- `allocation` must not be empty.
+- Asset percentages must be between `0` and `100`.
+- Allocation total must sum to `100`.
 
+### 2. Rebalance Portfolio
 
-## Evaluation Criteria
+`POST /rebalance/{user_id}`
 
-- Code quality and structure
-- Logical correctness
-- Fault tolerance
-- Extensibility and Scalablility
-- Test coverage
-- Optional: Error handling and edge cases.
+Accepts an updated allocation from a provider and calculates the transactions needed to rebalance back to the user's original allocation.
+
+Request body:
+
+```json
+{
+  "new_allocation": {
+    "stocks": 70,
+    "bonds": 20,
+    "gold": 10
+  }
+}
+```
+
+Success response: `200 OK`
+
+Example:
+
+```bash
+curl -X POST http://localhost:8080/rebalance/user-1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "new_allocation": {
+      "stocks": 70,
+      "bonds": 20,
+      "gold": 10
+    }
+  }'
+```
+
+Behavior:
+
+- Returns `404 Not Found` if the user portfolio does not exist.
+- Returns `400 Bad Request` for invalid payloads.
+- Handles added assets and removed assets during rebalance calculation.
+- Ignores tiny floating-point drift so it does not generate noise transactions.
+
+## Rebalance Logic
+
+The service compares the user's original saved allocation with the incoming updated allocation and emits `BUY` / `SELL` transactions for the difference.
+
+Example:
+
+- Original allocation: `{"stocks": 60, "bonds": 30, "gold": 10}`
+- Updated allocation: `{"stocks": 70, "bonds": 20, "gold": 10}`
+
+Generated transactions:
+
+- `BUY 10% stocks`
+- `SELL 10% bonds`
+
+Edge cases handled:
+
+- New asset added in the updated allocation
+- Existing asset removed from the updated allocation
+- No-op rebalance when allocations are effectively equal
+- Tiny float drift near zero
+
+## Error Response Format
+
+All API errors return JSON in this format:
+
+```json
+{
+  "errorMessage": "Portfolio validation failed",
+  "errorCode": 400,
+  "errorDetails": "allocation: total allocation must sum to 100"
+}
+```
+
+Fields:
+
+- `errorMessage`: high-level client-facing message
+- `errorCode`: HTTP status code
+- `errorDetails`: specific validation or internal failure details
+
+## Swagger Docs
+
+Swagger is generated and served from the running API.
+
+Use:
+
+- Swagger UI: `http://localhost:8080/docs/index.html`
+- OpenAPI JSON: `http://localhost:8080/docs/doc.json`
+
+The Swagger request models match the live API:
+
+- `POST /portfolio/{user_id}` takes `user_id` from the path and `allocation` in the body
+- `POST /rebalance/{user_id}` takes `user_id` from the path and `new_allocation` in the body
+
+## Running Tests
+
+Run all tests:
+
+```bash
+go test ./...
+```
+
+Run with coverage:
+
+```bash
+go test ./... -cover
+```
+
+Current test coverage is strongest in the core logic packages:
+
+- handlers
+- models
+- services
+
+## Current Behavior Summary
+
+- `main` is intentionally small; bootstrapping and route registration are separated.
+- Duplicate portfolio creation is rejected with `409 Conflict`.
+- Validation lives close to the request models through `Validate()` methods.
+- Error responses are returned as structured JSON.
+- Rebalance transaction writes use stable transaction IDs for idempotent persistence.
+- Docker startup includes API, Elasticsearch, Kafka, and Swagger access.
+
+## Notes
+
+- The API currently persists data in Elasticsearch directly.
+- Kafka is used as a fallback path if transaction persistence fails.
+- This is a synchronous request flow intended to be correct and observable first.
+
