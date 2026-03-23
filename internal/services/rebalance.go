@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,9 @@ import (
 	"portfolio-rebalancer/internal/models"
 	"portfolio-rebalancer/internal/queue"
 	"portfolio-rebalancer/internal/storage"
+	"sort"
+	"strconv"
+	"strings"
 )
 
 const rebalanceTolerance = 1e-9
@@ -43,6 +47,7 @@ func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPort
 	errCh := make(chan error, len(transactions))
 	for _, transaction := range transactions {
 		transaction.UserID = req.UserID
+		transaction.TransactionID = buildTransactionID(req.UserID, original.Allocation, req.NewAllocation, transaction)
 		transaction := transaction // capture range variable
 
 		go func() {
@@ -75,6 +80,48 @@ func classifyValidationError(err error) error {
 		return fmt.Errorf("%w: %s", ErrInvalidUserID, validationErr.Error())
 	}
 	return fmt.Errorf("%w: %s", ErrInvalidAllocation, validationErr.Error())
+}
+
+func buildTransactionID(userID string, currentAllocation, updatedAllocation map[string]float64, transaction models.RebalanceTransaction) string {
+	var builder strings.Builder
+	builder.WriteString(userID)
+	builder.WriteString("|current:")
+	builder.WriteString(canonicalAllocation(currentAllocation))
+	builder.WriteString("|updated:")
+	builder.WriteString(canonicalAllocation(updatedAllocation))
+	builder.WriteString("|asset:")
+	builder.WriteString(transaction.Asset)
+	builder.WriteString("|action:")
+	builder.WriteString(transaction.Action)
+	builder.WriteString("|percent:")
+	builder.WriteString(strconv.FormatFloat(transaction.RebalancePercent, 'f', -1, 64))
+
+	sum := sha256.Sum256([]byte(builder.String()))
+	return fmt.Sprintf("%x", sum)
+}
+
+func canonicalAllocation(allocation map[string]float64) string {
+	if len(allocation) == 0 {
+		return ""
+	}
+
+	keys := make([]string, 0, len(allocation))
+	for asset := range allocation {
+		keys = append(keys, asset)
+	}
+	sort.Strings(keys)
+
+	var builder strings.Builder
+	for i, asset := range keys {
+		if i > 0 {
+			builder.WriteString(",")
+		}
+		builder.WriteString(asset)
+		builder.WriteString("=")
+		builder.WriteString(strconv.FormatFloat(allocation[asset], 'f', -1, 64))
+	}
+
+	return builder.String()
 }
 
 func CalculateRebalance(currentAllocation, updatedAllocation map[string]float64) []models.RebalanceTransaction {

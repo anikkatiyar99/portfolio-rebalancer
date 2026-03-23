@@ -101,7 +101,7 @@ func (e *ElasticStore) SaveTransaction(ctx context.Context, t models.RebalanceTr
 		return err
 	}
 
-	res, err := esClient.Index("transactions", bytes.NewReader(body))
+	res, err := esClient.Index("transactions", bytes.NewReader(body), esClient.Index.WithDocumentID(t.TransactionID))
 	if err != nil {
 		return err
 	}

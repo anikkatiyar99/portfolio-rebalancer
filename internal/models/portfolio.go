@@ -11,6 +11,7 @@ type UpdatedPortfolio struct {
 }
 
 type RebalanceTransaction struct {
+	TransactionID    string  `json:"transaction_id"`
 	UserID           string  `json:"user_id"`
 	Action           string  `json:"action"`            // can be BUY/SELL
 	Asset            string  `json:"asset"`             // can be stocks, bonds, commodities, etc.
