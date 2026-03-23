@@ -2,7 +2,11 @@ basePath: /
 definitions:
   models.ErrorResponse:
     properties:
-      error:
+      errorCode:
+        type: integer
+      errorDetails:
+        type: string
+      errorMessage:
         type: string
     type: object
   models.MessageResponse:
@@ -38,12 +42,17 @@ info:
   title: Portfolio Rebalancer API
   version: "1.0"
 paths:
-  /portfolio:
+  /portfolio/{user_id}:
     post:
       consumes:
       - application/json
       description: Create a user's portfolio with target allocation percentages
       parameters:
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
       - description: Portfolio payload
         in: body
         name: request
@@ -65,6 +74,10 @@ paths:
           description: Method Not Allowed
           schema:
             $ref: '#/definitions/models.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -72,13 +85,18 @@ paths:
       summary: Create portfolio
       tags:
       - portfolio
-  /rebalance:
+  /rebalance/{user_id}:
     post:
       consumes:
       - application/json
       description: Calculate and persist rebalance transactions for a user's updated
         allocation
       parameters:
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
       - description: Updated portfolio payload
         in: body
         name: request

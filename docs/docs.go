@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/portfolio": {
+        "/portfolio/{user_id}": {
             "post": {
                 "description": "Create a user's portfolio with target allocation percentages",
                 "consumes": [
@@ -29,6 +29,13 @@ const docTemplate = `{
                 ],
                 "summary": "Create portfolio",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "description": "Portfolio payload",
                         "name": "request",
@@ -58,6 +65,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -67,7 +80,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rebalance": {
+        "/rebalance/{user_id}": {
             "post": {
                 "description": "Calculate and persist rebalance transactions for a user's updated allocation",
                 "consumes": [
@@ -81,6 +94,13 @@ const docTemplate = `{
                 ],
                 "summary": "Rebalance portfolio",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "description": "Updated portfolio payload",
                         "name": "request",
@@ -130,7 +150,13 @@ const docTemplate = `{
         "models.ErrorResponse": {
             "type": "object",
             "properties": {
-                "error": {
+                "errorCode": {
+                    "type": "integer"
+                },
+                "errorDetails": {
+                    "type": "string"
+                },
+                "errorMessage": {
                     "type": "string"
                 }
             }

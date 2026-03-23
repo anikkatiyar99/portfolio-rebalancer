@@ -35,7 +35,9 @@ func main() {
 	h := handlers.NewHandler(store, rebalanceService)
 
 	http.HandleFunc("/portfolio", h.HandlePortfolio)
+	http.HandleFunc("/portfolio/", h.HandlePortfolio)
 	http.HandleFunc("/rebalance", h.HandleRebalance)
+	http.HandleFunc("/rebalance/", h.HandleRebalance)
 	http.Handle("/docs/", httpSwagger.Handler(
 		httpSwagger.URL("/docs/doc.json"),
 	))

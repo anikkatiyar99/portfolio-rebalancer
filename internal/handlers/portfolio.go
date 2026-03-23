@@ -8,6 +8,7 @@ import (
 	"portfolio-rebalancer/internal/models"
 	"portfolio-rebalancer/internal/services"
 	"portfolio-rebalancer/internal/storage"
+	"strings"
 )
 
 type Handler struct {
@@ -32,22 +33,39 @@ func writeJSONError(w http.ResponseWriter, status int, message, details string) 
 	})
 }
 
+func extractUserID(path, prefix string) string {
+	if !strings.HasPrefix(path, prefix) {
+		return ""
+	}
+
+	userID := strings.TrimPrefix(path, prefix)
+	userID = strings.Trim(userID, "/")
+	return userID
+}
+
 // HandlePortfolio godoc
 // @Summary Create portfolio
 // @Description Create a user's portfolio with target allocation percentages
 // @Tags portfolio
 // @Accept json
 // @Produce json
+// @Param user_id path string true "User ID"
 // @Param request body models.Portfolio true "Portfolio payload"
 // @Success 201 {object} models.Portfolio
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 409 {object} models.ErrorResponse
 // @Failure 405 {object} models.ErrorResponse
 // @Failure 500 {object} models.ErrorResponse
-// @Router /portfolio [post]
+// @Router /portfolio/{user_id} [post]
 func (h *Handler) HandlePortfolio(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only POST is supported for this endpoint")
+		return
+	}
+
+	userID := extractUserID(r.URL.Path, "/portfolio/")
+	if userID == "" {
+		writeJSONError(w, http.StatusBadRequest, "Missing user id", "Use /portfolio/{user_id}")
 		return
 	}
 
@@ -57,6 +75,8 @@ func (h *Handler) HandlePortfolio(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
+
+	p.UserID = userID
 
 	logging.Infof("received portfolio create request for user %s", p.UserID)
 
@@ -91,16 +111,23 @@ func (h *Handler) HandlePortfolio(w http.ResponseWriter, r *http.Request) {
 // @Tags portfolio
 // @Accept json
 // @Produce json
+// @Param user_id path string true "User ID"
 // @Param request body models.UpdatedPortfolio true "Updated portfolio payload"
 // @Success 200 {object} models.MessageResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 404 {object} models.ErrorResponse
 // @Failure 405 {object} models.ErrorResponse
 // @Failure 500 {object} models.ErrorResponse
-// @Router /rebalance [post]
+// @Router /rebalance/{user_id} [post]
 func (h *Handler) HandleRebalance(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "Method not allowed", "Only POST is supported for this endpoint")
+		return
+	}
+
+	userID := extractUserID(r.URL.Path, "/rebalance/")
+	if userID == "" {
+		writeJSONError(w, http.StatusBadRequest, "Missing user id", "Use /rebalance/{user_id}")
 		return
 	}
 
@@ -110,6 +137,8 @@ func (h *Handler) HandleRebalance(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
+
+	p.UserID = userID
 
 	if err := h.rebalanceService.Rebalance(r.Context(), p); err != nil {
 		if errors.Is(err, services.ErrInvalidUserID) || errors.Is(err, services.ErrInvalidAllocation) {
