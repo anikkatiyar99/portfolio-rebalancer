@@ -14,6 +14,7 @@ type stubStore struct {
 	getPortfolioErr   error
 	saveTxnErr        error
 	savedTransactions []models.RebalanceTransaction
+	savedDeadLetters  []models.DeadLetterMessage
 }
 
 func (s *stubStore) SavePortfolio(ctx context.Context, p models.Portfolio) error {
@@ -30,6 +31,11 @@ func (s *stubStore) GetPortfolio(ctx context.Context, userID string) (*models.Po
 func (s *stubStore) SaveTransaction(ctx context.Context, t models.RebalanceTransaction) error {
 	s.savedTransactions = append(s.savedTransactions, t)
 	return s.saveTxnErr
+}
+
+func (s *stubStore) SaveDeadLetter(ctx context.Context, dlq models.DeadLetterMessage) error {
+	s.savedDeadLetters = append(s.savedDeadLetters, dlq)
+	return nil
 }
 
 type stubPublisher struct {
@@ -132,5 +138,40 @@ func TestRebalanceSuccessSavesTransactions(t *testing.T) {
 	}
 	if len(store.savedTransactions) != 2 {
 		t.Fatalf("expected 2 saved transactions, got %d", len(store.savedTransactions))
+	}
+}
+
+func TestRebalanceSavesDeadLetterWhenKafkaFallbackFails(t *testing.T) {
+	store := &stubStore{
+		portfolio: &models.Portfolio{
+			UserID: "user-1",
+			Allocation: map[string]float64{
+				"stocks": 60,
+				"bonds":  40,
+			},
+		},
+		saveTxnErr: errors.New("elastic write failed"),
+	}
+	publisher := &stubPublisher{err: errors.New("kafka unavailable")}
+	service := NewRebalanceService(store, publisher)
+
+	err := service.Rebalance(context.Background(), models.UpdatedPortfolio{
+		UserID: "user-1",
+		NewAllocation: map[string]float64{
+			"stocks": 70,
+			"bonds":  30,
+		},
+	})
+	if err == nil {
+		t.Fatal("expected rebalance error, got nil")
+	}
+	if len(store.savedDeadLetters) != 1 {
+		t.Fatalf("expected 1 dead letter, got %d", len(store.savedDeadLetters))
+	}
+	if store.savedDeadLetters[0].UserID != "user-1" {
+		t.Fatalf("expected dead letter for user-1, got %q", store.savedDeadLetters[0].UserID)
+	}
+	if store.savedDeadLetters[0].Payload == "" {
+		t.Fatal("expected dead letter payload to be captured")
 	}
 }

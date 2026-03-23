@@ -114,3 +114,23 @@ func (e *ElasticStore) SaveTransaction(ctx context.Context, t models.RebalanceTr
 	logging.Infof("transaction saved for user %s", t.UserID)
 	return nil
 }
+
+func (e *ElasticStore) SaveDeadLetter(ctx context.Context, dlq models.DeadLetterMessage) error {
+	body, err := json.Marshal(dlq)
+	if err != nil {
+		return err
+	}
+
+	res, err := esClient.Index("dead_letters", bytes.NewReader(body), esClient.Index.WithDocumentID(dlq.ID))
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return fmt.Errorf("error saving dead letter: %s", res.String())
+	}
+
+	logging.Warnf("dead letter saved for user %s at stage %s", dlq.UserID, dlq.Stage)
+	return nil
+}

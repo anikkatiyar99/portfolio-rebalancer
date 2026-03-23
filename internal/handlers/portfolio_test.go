@@ -37,6 +37,10 @@ func (s *handlerStore) SaveTransaction(ctx context.Context, t models.RebalanceTr
 	return nil
 }
 
+func (s *handlerStore) SaveDeadLetter(ctx context.Context, dlq models.DeadLetterMessage) error {
+	return nil
+}
+
 type handlerRebalancer struct {
 	err error
 }

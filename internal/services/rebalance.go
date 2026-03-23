@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const rebalanceTolerance = 1e-9
@@ -63,10 +64,16 @@ func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPort
 		if err := <-errCh; err != nil {
 			payload, marshalErr := json.Marshal(req)
 			if marshalErr != nil {
+				if dlqErr := s.saveDeadLetter(ctx, req.UserID, "", fmt.Sprintf("marshal fallback payload: %v", marshalErr)); dlqErr != nil {
+					return fmt.Errorf("save transaction: %w; marshal fallback payload: %v; save dead letter: %v", err, marshalErr, dlqErr)
+				}
 				return fmt.Errorf("save transaction: %w; marshal fallback payload: %v", err, marshalErr)
 			}
 			if publishErr := s.publisher.PublishMessage(ctx, payload); publishErr != nil {
 				logging.Errorf("failed to publish Kafka fallback for user %s: %v", req.UserID, publishErr)
+				if dlqErr := s.saveDeadLetter(ctx, req.UserID, string(payload), fmt.Sprintf("publish fallback payload: %v", publishErr)); dlqErr != nil {
+					return fmt.Errorf("save transaction: %w; publish fallback payload: %v; save dead letter: %v", err, publishErr, dlqErr)
+				}
 				return fmt.Errorf("save transaction: %w; publish fallback payload: %v", err, publishErr)
 			}
 			return fmt.Errorf("save transaction: %w", err)
@@ -74,6 +81,19 @@ func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPort
 	}
 
 	return nil
+}
+
+func (s *RebalanceService) saveDeadLetter(ctx context.Context, userID, payload, reason string) error {
+	dlq := models.DeadLetterMessage{
+		ID:        buildDeadLetterID(userID, payload, reason),
+		UserID:    userID,
+		Stage:     "rebalance_fallback_publish",
+		Reason:    reason,
+		Payload:   payload,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	return s.store.SaveDeadLetter(ctx, dlq)
 }
 
 func classifyValidationError(err error) error {
@@ -109,6 +129,18 @@ func buildTransactionID(userID string, currentAllocation, updatedAllocation map[
 	builder.WriteString(transaction.Action)
 	builder.WriteString("|percent:")
 	builder.WriteString(strconv.FormatFloat(transaction.RebalancePercent, 'f', -1, 64))
+
+	sum := sha256.Sum256([]byte(builder.String()))
+	return fmt.Sprintf("%x", sum)
+}
+
+func buildDeadLetterID(userID, payload, reason string) string {
+	var builder strings.Builder
+	builder.WriteString(userID)
+	builder.WriteString("|payload:")
+	builder.WriteString(payload)
+	builder.WriteString("|reason:")
+	builder.WriteString(reason)
 
 	sum := sha256.Sum256([]byte(builder.String()))
 	return fmt.Sprintf("%x", sum)
