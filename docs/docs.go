@@ -42,7 +42,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.Portfolio"
+                            "$ref": "#/definitions/models.CreatePortfolioRequest"
                         }
                     }
                 ],
@@ -107,7 +107,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.UpdatedPortfolio"
+                            "$ref": "#/definitions/models.RebalanceRequest"
                         }
                     }
                 ],
@@ -147,6 +147,18 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "models.CreatePortfolioRequest": {
+            "type": "object",
+            "properties": {
+                "allocation": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                }
+            }
+        },
         "models.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -185,19 +197,15 @@ const docTemplate = `{
                 }
             }
         },
-        "models.UpdatedPortfolio": {
+        "models.RebalanceRequest": {
             "type": "object",
             "properties": {
                 "new_allocation": {
-                    "description": "Updated user allocation from provider in percentage terms",
                     "type": "object",
                     "additionalProperties": {
                         "type": "number",
                         "format": "float64"
                     }
-                },
-                "user_id": {
-                    "type": "string"
                 }
             }
         }
@@ -206,12 +214,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "",
 	Host:             "",
-	BasePath:         "/",
+	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "Portfolio Rebalancer API",
-	Description:      "APIs for managing portfolios and triggering rebalance transactions.",
+	Title:            "",
+	Description:      "",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

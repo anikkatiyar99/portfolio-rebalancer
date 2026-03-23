@@ -1,12 +1,8 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "APIs for managing portfolios and triggering rebalance transactions.",
-        "title": "Portfolio Rebalancer API",
-        "contact": {},
-        "version": "1.0"
+        "contact": {}
     },
-    "basePath": "/",
     "paths": {
         "/portfolio/{user_id}": {
             "post": {
@@ -35,7 +31,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.Portfolio"
+                            "$ref": "#/definitions/models.CreatePortfolioRequest"
                         }
                     }
                 ],
@@ -100,7 +96,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.UpdatedPortfolio"
+                            "$ref": "#/definitions/models.RebalanceRequest"
                         }
                     }
                 ],
@@ -140,6 +136,18 @@
         }
     },
     "definitions": {
+        "models.CreatePortfolioRequest": {
+            "type": "object",
+            "properties": {
+                "allocation": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                }
+            }
+        },
         "models.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -178,19 +186,15 @@
                 }
             }
         },
-        "models.UpdatedPortfolio": {
+        "models.RebalanceRequest": {
             "type": "object",
             "properties": {
                 "new_allocation": {
-                    "description": "Updated user allocation from provider in percentage terms",
                     "type": "object",
                     "additionalProperties": {
                         "type": "number",
                         "format": "float64"
                     }
-                },
-                "user_id": {
-                    "type": "string"
                 }
             }
         }

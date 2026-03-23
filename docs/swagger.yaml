@@ -1,5 +1,12 @@
-basePath: /
 definitions:
+  models.CreatePortfolioRequest:
+    properties:
+      allocation:
+        additionalProperties:
+          format: float64
+          type: number
+        type: object
+    type: object
   models.ErrorResponse:
     properties:
       errorCode:
@@ -25,22 +32,16 @@ definitions:
       user_id:
         type: string
     type: object
-  models.UpdatedPortfolio:
+  models.RebalanceRequest:
     properties:
       new_allocation:
         additionalProperties:
           format: float64
           type: number
-        description: Updated user allocation from provider in percentage terms
         type: object
-      user_id:
-        type: string
     type: object
 info:
   contact: {}
-  description: APIs for managing portfolios and triggering rebalance transactions.
-  title: Portfolio Rebalancer API
-  version: "1.0"
 paths:
   /portfolio/{user_id}:
     post:
@@ -58,7 +59,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/models.Portfolio'
+          $ref: '#/definitions/models.CreatePortfolioRequest'
       produces:
       - application/json
       responses:
@@ -102,7 +103,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/models.UpdatedPortfolio'
+          $ref: '#/definitions/models.RebalanceRequest'
       produces:
       - application/json
       responses:

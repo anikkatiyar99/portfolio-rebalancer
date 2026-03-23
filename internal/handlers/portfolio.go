@@ -50,7 +50,7 @@ func extractUserID(path, prefix string) string {
 // @Accept json
 // @Produce json
 // @Param user_id path string true "User ID"
-// @Param request body models.Portfolio true "Portfolio payload"
+// @Param request body models.CreatePortfolioRequest true "Portfolio payload"
 // @Success 201 {object} models.Portfolio
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 409 {object} models.ErrorResponse
@@ -69,14 +69,17 @@ func (h *Handler) HandlePortfolio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var p models.Portfolio
-	err := json.NewDecoder(r.Body).Decode(&p)
+	var req models.CreatePortfolioRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
 
-	p.UserID = userID
+	p := models.Portfolio{
+		UserID:     userID,
+		Allocation: req.Allocation,
+	}
 
 	logging.Infof("received portfolio create request for user %s", p.UserID)
 
@@ -112,7 +115,7 @@ func (h *Handler) HandlePortfolio(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param user_id path string true "User ID"
-// @Param request body models.UpdatedPortfolio true "Updated portfolio payload"
+// @Param request body models.RebalanceRequest true "Updated portfolio payload"
 // @Success 200 {object} models.MessageResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 404 {object} models.ErrorResponse
@@ -131,14 +134,17 @@ func (h *Handler) HandleRebalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var p models.UpdatedPortfolio
-	err := json.NewDecoder(r.Body).Decode(&p)
+	var req models.RebalanceRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
 
-	p.UserID = userID
+	p := models.UpdatedPortfolio{
+		UserID:        userID,
+		NewAllocation: req.NewAllocation,
+	}
 
 	if err := h.rebalanceService.Rebalance(r.Context(), p); err != nil {
 		if errors.Is(err, services.ErrInvalidUserID) || errors.Is(err, services.ErrInvalidAllocation) {

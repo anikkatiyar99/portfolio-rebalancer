@@ -79,12 +79,21 @@ func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPort
 func classifyValidationError(err error) error {
 	var validationErr *models.ValidationError
 	if !errors.As(err, &validationErr) {
-		return fmt.Errorf("%w: %v", ErrInvalidAllocation, err)
+		return &ValidationServiceError{
+			Kind:    ErrInvalidAllocation,
+			Details: err.Error(),
+		}
 	}
 	if validationErr.Field == "user_id" {
-		return fmt.Errorf("%w: %s", ErrInvalidUserID, validationErr.Error())
+		return &ValidationServiceError{
+			Kind:    ErrInvalidUserID,
+			Details: validationErr.Error(),
+		}
 	}
-	return fmt.Errorf("%w: %s", ErrInvalidAllocation, validationErr.Error())
+	return &ValidationServiceError{
+		Kind:    ErrInvalidAllocation,
+		Details: validationErr.Error(),
+	}
 }
 
 func buildTransactionID(userID string, currentAllocation, updatedAllocation map[string]float64, transaction models.RebalanceTransaction) string {
