@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"portfolio-rebalancer/internal/handlers"
 	"portfolio-rebalancer/internal/queue"
+	"portfolio-rebalancer/internal/services"
 	"portfolio-rebalancer/internal/storage"
 )
 
@@ -19,7 +20,8 @@ func main() {
 
 	store := storage.NewElasticStore()
 	publisher := queue.NewKafkaPublisher()
-	h := handlers.NewHandler(store, publisher)
+	rebalanceService := services.NewRebalanceService(store, publisher)
+	h := handlers.NewHandler(store, rebalanceService)
 
 	http.HandleFunc("/portfolio", h.HandlePortfolio)
 	http.HandleFunc("/rebalance", h.HandleRebalance)

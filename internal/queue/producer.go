@@ -10,10 +10,6 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-type MessagePublisher interface {
-	PublishMessage(ctx context.Context, payload []byte) error
-}
-
 type KafkaPublisher struct{}
 
 func NewKafkaPublisher() *KafkaPublisher {

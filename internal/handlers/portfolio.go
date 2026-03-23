@@ -2,21 +2,24 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"portfolio-rebalancer/internal/models"
-	"portfolio-rebalancer/internal/queue"
 	"portfolio-rebalancer/internal/services"
 	"portfolio-rebalancer/internal/storage"
 )
 
 type Handler struct {
-	store     storage.PortfolioStore
-	publisher queue.MessagePublisher
+	store            storage.PortfolioStore
+	rebalanceService services.Rebalancer
 }
 
-func NewHandler(store storage.PortfolioStore, publisher queue.MessagePublisher) *Handler {
-	return &Handler{store: store, publisher: publisher}
+func NewHandler(store storage.PortfolioStore, rebalanceService services.Rebalancer) *Handler {
+	return &Handler{
+		store:            store,
+		rebalanceService: rebalanceService,
+	}
 }
 
 func (h *Handler) HandlePortfolio(w http.ResponseWriter, r *http.Request) {
@@ -72,21 +75,15 @@ func (h *Handler) HandleRebalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	original, err := h.store.GetPortfolio(r.Context(), p.UserID)
-	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
-		return
-	}
-
-	transactions := services.CalculateRebalance(original.Allocation, p.NewAllocation)
-
-	for _, t := range transactions {
-		if err := h.store.SaveTransaction(r.Context(), t); err != nil {
-			payload, _ := json.Marshal(p)
-			if err := h.publisher.PublishMessage(r.Context(), payload); err != nil {
-				log.Println("Failed to publish message to Kafka:", err)
-			}
+	if err := h.rebalanceService.Rebalance(r.Context(), p); err != nil {
+		if errors.Is(err, services.ErrPortfolioNotFound) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
 		}
+
+		log.Println("Failed to rebalance portfolio:", err)
+		http.Error(w, "Failed to rebalance portfolio", http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
