@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"portfolio-rebalancer/internal/models"
 	"portfolio-rebalancer/internal/queue"
 	"portfolio-rebalancer/internal/storage"
 )
 
 var ErrPortfolioNotFound = errors.New("portfolio not found")
+
+const rebalanceTolerance = 1e-9
 
 type RebalanceService struct {
 	store     storage.PortfolioStore
@@ -61,17 +64,30 @@ func (s *RebalanceService) Rebalance(ctx context.Context, req models.UpdatedPort
 	return nil
 }
 
-func CalculateRebalance(updatedAllocation, currentAlloctaion map[string]float64) []models.RebalanceTransaction {
+func CalculateRebalance(currentAllocation, updatedAllocation map[string]float64) []models.RebalanceTransaction {
 	var result []models.RebalanceTransaction
+	seenAssets := make(map[string]struct{})
 
 	// TODO: create rebalance transactions and update portfolio
 	// For example, if the current allocation is {"stocks": 60, "bonds": 30, "gold": 10} and
 	// the new allocation is {"stocks": 70, "bonds": 20, "gold": 10},
 	// then we need to BUY 10% of stocks and SELL 10% of bonds.
 
-	for asset, newPercent := range updatedAllocation {
-		currentPercent := currentAlloctaion[asset]
+	for asset := range currentAllocation {
+		seenAssets[asset] = struct{}{}
+	}
+	for asset := range updatedAllocation {
+		seenAssets[asset] = struct{}{}
+	}
+
+	for asset := range seenAssets {
+		currentPercent := currentAllocation[asset]
+		newPercent := updatedAllocation[asset]
 		diff := newPercent - currentPercent
+
+		if math.Abs(diff) <= rebalanceTolerance {
+			continue
+		}
 
 		if diff > 0 {
 			result = append(result, models.RebalanceTransaction{
